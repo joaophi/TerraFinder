@@ -26,6 +26,7 @@ import { LogfinderAmountRuleSet } from "../../store/LogfinderRuleSetStore";
 import useFCD from "../../hooks/useFCD";
 import TxAmount from "../Tx/TxAmount";
 import s from "./Txs.module.scss";
+import { da } from "date-fns/locale";
 
 type Fee = {
   denom: string;
@@ -137,15 +138,56 @@ const Txs = ({ address }: { address: string }) => {
 
   useEffect(() => {
     if (data?.txs) {
-      const txRow = data.txs.map(tx => {
-        const matchedLogs = getTxAmounts(
-          JSON.stringify(tx),
-          logMatcher,
-          address
-        );
-        return getRow(tx, chainID, address, matchedLogs);
-      });
+      const txRow = data.txs
+        .map<[TxResponse, LogFinderAmountResult[][] | undefined]>(tx => [
+          tx,
+          getTxAmounts(JSON.stringify(tx), logMatcher, address)
+        ])
+        .filter(([tx, matchedLogs]) => {
+          let amountIn = false;
+          let amountOut = false;
+          matchedLogs?.forEach(matchedLog => {
+            if (
+              matchedLog &&
+              matchedLog[0]?.transformed?.type === "multiSend"
+            ) {
+              matchedLog.forEach(log => {
+                const recipient = log.match[0].value;
+                const coin = log.match[1].value.split(",").map(splitCoinData);
+
+                coin.forEach(data => {
+                  if (data) {
+                    if (recipient === address) {
+                      amountIn = true;
+                    } else {
+                      amountOut = true;
+                    }
+                  }
+                });
+              });
+            } else {
+              matchedLog?.forEach(log => {
+                const sender = log.transformed?.sender;
+                const recipient = log.transformed?.recipient;
+
+                if (address === sender) {
+                  amountOut = true;
+                }
+
+                if (address === recipient) {
+                  amountIn = true;
+                }
+              });
+            }
+          });
+          return amountOut != amountIn;
+        })
+        .map(([tx, matchedLogs]) => getRow(tx, chainID, address, matchedLogs));
       setTxsRow(stack => [...stack, ...txRow]);
+      if (data.next)
+        setTimeout(() => {
+          setOffset(data.next);
+        }, 1000);
     }
     // eslint-disable-next-line
   }, [data, chainID, address]);
@@ -153,11 +195,11 @@ const Txs = ({ address }: { address: string }) => {
   const head = [
     `Tx hash`,
     `Type`,
-    `Block`,
+    `Address`,
     `Amount (Out)`,
     `Amount (In)`,
-    `Timestamp`,
-    `Fee`
+    `Timestamp`
+    // `Fee`
   ];
 
   return (
@@ -202,8 +244,40 @@ const getRow = (
   const { tx: txBody, txhash, height, timestamp, chainId } = response;
   const isSuccess = !response.code;
   const [amountIn, amountOut] = getAmount(address, matchedMsg);
-  const fee = getTxFee(txBody?.value?.fee?.amount?.[0]);
-  const feeData = fee?.split(" ");
+  // const fee = getTxFee(txBody?.value?.fee?.amount?.[0]);
+  // const feeData = fee?.split(" ");
+  let otherAddress = "not found";
+  matchedMsg?.forEach(matchedLog => {
+    if (matchedLog && matchedLog[0]?.transformed?.type === "multiSend") {
+      matchedLog.forEach(log => {
+        const recipient = log.match[0].value;
+        const coin = log.match[1].value.split(",").map(splitCoinData);
+
+        coin.forEach(data => {
+          if (data) {
+            if (recipient === address) {
+              // otherAddress = sender;
+            } else {
+              otherAddress = recipient;
+            }
+          }
+        });
+      });
+    } else {
+      matchedLog?.forEach(log => {
+        const sender = log.transformed?.sender;
+        const recipient = log.transformed?.recipient;
+
+        if (address === sender) {
+          otherAddress = recipient ?? "not found";
+        }
+
+        if (address === recipient) {
+          otherAddress = sender ?? "not found";
+        }
+      });
+    }
+  });
 
   return [
     <span>
@@ -220,10 +294,10 @@ const getRow = (
     </span>,
     <span className="type">{sliceMsgType(txBody.value.msg[0].type)}</span>,
     <span>
-      <Finder q="blocks" network={network} v={height}>
-        {height}
+      <Finder q="address" network={network} v={otherAddress}>
+        {otherAddress}
       </Finder>
-      <span>({chainId})</span>
+      {/* <span>({chainId})</span> */}
     </span>,
     <span className={s.amount}>
       {amountOut.length
@@ -247,9 +321,9 @@ const getRow = (
           })
         : "-"}
     </span>,
-    <span>{fromISOTime(timestamp.toString())}</span>,
-    <span>
-      {<TxAmount amount={feeData?.[0]} denom={feeData?.[1]} isFormatAmount />}
-    </span>
+    <span>{fromISOTime(timestamp.toString())}</span>
+    // <span>
+    //   {<TxAmount amount={feeData?.[0]} denom={feeData?.[1]} isFormatAmount />}
+    // </span>
   ];
 };
