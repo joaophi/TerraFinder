@@ -1,15 +1,16 @@
 import s from "./PaginationButtons.module.scss";
 
 type Props = {
+  text: string;
   action?: (offset: number) => void;
   offset?: number;
   loading?: boolean;
 };
 
-const PaginationButtons = ({ action, offset, loading }: Props) =>
+const PaginationButtons = ({ text, action, offset, loading }: Props) =>
   offset ? (
     <div className={s.component}>
-      {renderAction("MORE", offset, action, loading)}
+      {renderAction(text, offset, action, loading)}
     </div>
   ) : (
     <></>

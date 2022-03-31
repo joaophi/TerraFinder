@@ -15,7 +15,12 @@ const Pagination = (props: PaginationProps) => {
   return (
     <>
       {children}
-      <PaginationButtons action={action} offset={next} loading={loading} />
+      <PaginationButtons
+        text="MORE"
+        action={action}
+        offset={next}
+        loading={loading}
+      />
     </>
   );
 };

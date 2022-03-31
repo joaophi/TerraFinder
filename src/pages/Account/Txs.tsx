@@ -17,6 +17,7 @@ import Coin from "../../components/Coin";
 import { useCurrentChain } from "../../contexts/ChainsContext";
 import {
   fromISOTime,
+  isTerraAddress,
   sliceMsgType,
   splitCoinData
 } from "../../scripts/utility";
@@ -27,6 +28,12 @@ import useFCD from "../../hooks/useFCD";
 import TxAmount from "../Tx/TxAmount";
 import s from "./Txs.module.scss";
 import { da } from "date-fns/locale";
+import ModalWithButton from "../../components/ModalWithButton";
+import PaginationButtons from "../../components/PaginationButtons";
+import { Tokens } from "../../hooks/cw20/useTokenBalance";
+import { Whitelist } from "../../store/WhitelistStore";
+import { Contracts } from "../../store/ContractStore";
+import { Dictionary } from "ramda/tools";
 
 type Fee = {
   denom: string;
@@ -184,10 +191,7 @@ const Txs = ({ address }: { address: string }) => {
         })
         .map(([tx, matchedLogs]) => getRow(tx, chainID, address, matchedLogs));
       setTxsRow(stack => [...stack, ...txRow]);
-      if (data.next)
-        setTimeout(() => {
-          setOffset(data.next);
-        }, 1000);
+      if (data.next) setOffset(data.next);
     }
     // eslint-disable-next-line
   }, [data, chainID, address]);
@@ -201,6 +205,60 @@ const Txs = ({ address }: { address: string }) => {
     `Timestamp`
     // `Fee`
   ];
+
+  const whitelist: Tokens = useRecoilValue(Whitelist);
+  const contracts: Dictionary<Contracts> = useRecoilValue(Contracts);
+
+  const exportCSV = () => {
+    const element = document.createElement("a");
+
+    const csv = txsRow
+      .map(row => {
+        const address = row[2].props.children.props.v;
+        let amount;
+        let currency;
+        if (row[3].props.children === "-") {
+          amount =
+            row[4].props.children[0].props.children[0] +
+            row[4].props.children[0].props.children[1].props.amount;
+          currency = row[4].props.children[0].props.children[1].props.denom;
+        } else {
+          amount =
+            row[3].props.children[0].props.children[0] +
+            row[3].props.children[0].props.children[1].props.amount;
+          currency = row[3].props.children[0].props.children[1].props.denom;
+        }
+        const date = row[5].props.children;
+
+        const list = whitelist?.[currency];
+        const contract = contracts?.[currency];
+        if (isTerraAddress(currency) && (list || contract)) {
+          currency = list?.symbol ? list?.symbol : contract?.name;
+        } else if (format.denom(currency).length >= 40) {
+          currency = "Token";
+        } else {
+          currency = format.denom(currency);
+        }
+        amount = amount.slice(0, amount.length - 6) + "." + amount.slice(-6);
+
+        return `${date};${currency};${amount};${address}`;
+      })
+      .join("\n");
+
+    element.setAttribute(
+      "href",
+      "data:text/csv;charset=utf-8," +
+        encodeURIComponent("date;currency;amount;address\n" + csv)
+    );
+    element.setAttribute("download", `${address}.csv`);
+
+    element.style.display = "none";
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  };
 
   return (
     <Card title="Transactions" bordered headerClassName={s.cardTitle}>
@@ -229,6 +287,12 @@ const Txs = ({ address }: { address: string }) => {
           )}
         </div>
       </Pagination>
+      <PaginationButtons
+        text="Export to CSV"
+        action={exportCSV}
+        offset={1}
+        loading={false}
+      />
     </Card>
   );
 };

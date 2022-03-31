@@ -30,6 +30,7 @@ export const useCurrentChain = () => {
 };
 
 export const useFCDURL = () => {
-  const { lcd } = useCurrentChain();
-  return lcd.replace("lcd", "fcd");
+  // const { lcd } = useCurrentChain();
+  // return lcd.replace("lcd", "fcd");
+  return "/api";
 };
