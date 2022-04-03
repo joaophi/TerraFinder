@@ -79,3 +79,11 @@ interface TxResponse {
   timestamp: string;
   chainId?: string;
 }
+
+interface SimpleTxResponse {
+  txHash: string;
+  addresses: string[];
+  amountIn: { amount: string; denom: string }[];
+  amountOut: { amount: string; denom: string }[];
+  timestamp: string;
+}
