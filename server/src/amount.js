@@ -3,7 +3,6 @@ import { Coin } from "@terra-money/terra.js";
 import axios from "axios";
 import BN from "bignumber.js";
 import format from "./format.js";
-import { format as formatDate } from "date-fns-tz";
 
 const assetsConfig = { baseURL: "https://assets.terra.money" }
 const { data: { mainnet: whitelist } } = await axios.get("cw20/tokens.json", assetsConfig)
@@ -131,7 +130,7 @@ const parseAmounts = (tx, address) => {
     }
 }
 
-const parseTx = (tx, address) => {
+export const parseTx = (tx, address) => {
     const { addresses, amountIn, amountOut } = parseAmounts(tx, address)
 
     return {
@@ -143,4 +142,7 @@ const parseTx = (tx, address) => {
     }
 }
 
-export default parseTx
+export const isOneSided = ({ amountIn, amountOut }) => {
+    return (amountIn.length > 0 && amountOut.length == 0)
+        || (amountOut.length > 0 && amountIn.length == 0)
+}
