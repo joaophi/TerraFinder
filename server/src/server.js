@@ -2,7 +2,7 @@ import express from "express"
 import path from "path"
 import { isOneSided, parseTx } from "./amount.js"
 
-export const configureApi = (server, client, labels) => {
+export const configureApi = (server, client, db) => {
     const proxyPass = async (req, res) => {
         try {
             const response = await client.get(req.url.slice(4))
@@ -25,20 +25,6 @@ export const configureApi = (server, client, labels) => {
         } catch (error) {
             res.status(error.response?.status ?? 500)
             res.json(error.response?.data ?? { error: error.message })
-        }
-    })
-
-    server.get("/api/labels", (req, res) => {
-        if (req.query.account) {
-            if (req.query.label) {
-                const item = labels.get(req.query.account) ?? {}
-                labels.set(req.query.account, { ...item, label: req.query.label })
-            } else {
-                labels.delete(req.query.account)
-            }
-        } else {
-            const entries = Object.fromEntries(labels)
-            res.json(entries)
         }
     })
 
