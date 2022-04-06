@@ -138,7 +138,8 @@ export const parseTx = (tx, address) => {
         addresses: Array.from(addresses),
         amountIn,
         amountOut,
-        timestamp: tx.timestamp
+        timestamp: tx.timestamp,
+        rawTx: tx
     }
 }
 

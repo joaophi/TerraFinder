@@ -1,5 +1,6 @@
 import { Client, Intents } from "discord.js"
 import format from "./format.js"
+import getTxActions from "./format/index.js"
 
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
 await client.login(process.env["DISCORD_TOKEN"])
@@ -10,7 +11,7 @@ export const notifyTx = async (tx, channelId) => {
         fields: [
             {
                 name: "ACCOUNT",
-                value: `[${tx.account}](http://152.67.40.111:23869/mainnet/address/${tx.account})`,
+                value: `[${tx.account}](https://finder.terra.money//mainnet/address/${tx.account})`,
             },
             {
                 name: `VALUE ${tx.amountIn.length ? "RECEIVED" : "SENT"}`,
@@ -18,15 +19,15 @@ export const notifyTx = async (tx, channelId) => {
             },
             {
                 name: "CRYPTOS TRADED",
-                value: `${[...tx.amountIn, ...tx.amountOut].map(({ amount, denom }) => `${amount} ${denom}`).join(" - ")}`,
+                value: await getTxActions(tx.rawTx),
             },
             {
                 name: tx.amountIn.length ? "RECEIVED FROM" : "SENT TO",
-                value: tx.addresses.map(address => `[${address}](http://152.67.40.111:23869/mainnet/address/${address})`).join("\n")
+                value: tx.addresses.map(address => `[${address}](https://finder.terra.money/mainnet/address/${address})`).join("\n")
             },
             {
                 name: "HASH",
-                value: `[${tx.txHash}](http://152.67.40.111:23869/mainnet/tx/${tx.txHash})`,
+                value: `[${tx.txHash}](https://finder.terra.money/mainnet/tx/${tx.txHash})`,
             },
         ],
         timestamp: new Date(tx.timestamp),

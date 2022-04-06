@@ -44,7 +44,6 @@ const getPrice = async (symbol) => {
 
 export const configureNotifications = async (fcdApi, db) => {
     while (true) {
-        const addUsd = async ({ amount, denom }) => { return { amount, denom, usd: parseFloat(amount.replace(",", "")) * (await getPrice(denom)) } }
         db.each("SELECT account, amount, swap, channel, lastProcessed FROM watch", async (_, { account, amount, swap, channel, lastProcessed }) => {
             try {
                 const response = await fcdApi.get("/v1/txs", { params: { account, limit: 10 } })
@@ -56,19 +55,26 @@ export const configureNotifications = async (fcdApi, db) => {
 
                 (await Promise.all(response.data.txs
                     .filter(tx => lastProcessed && tx.id > lastProcessed)
+                    .map(tx => {
+                        console.log(`Processing: ${tx.id}`)
+                        return tx
+                    })
                     .map(tx => { return { ...parseTx(tx, account), id: tx.id, account } })
                     .filter(tx => (swap && !isOneSided(tx)) || (!swap && isOneSided(tx)))
                     .map(async tx => {
-                        const amountIn = await Promise.all(tx.amountIn.map(addUsd))
-                        const amountOut = await Promise.all(tx.amountOut.map(addUsd))
-                        const totalAmount = (swap ? amountIn : [...amountIn, ...amountOut])
-                            .map(a => a.usd)
-                            .reduce((a, b) => a + b, 0)
+                        // const amountIn = await Promise.all(tx.amountIn.map(addUsd))
+                        // const amountOut = await Promise.all(tx.amountOut.map(addUsd))
+                        // const totalAmount = (swap ? amountIn : [...amountIn, ...amountOut])
+                        //     .map(a => a.usd)
+                        //     .reduce((a, b) => a + b, 0)
+                        const usts = [...tx.amountIn, ...tx.amountOut]
+                            .filter(({ _, denom }) => denom == "UST")
+                            .map(({ amount }) => parseFloat(amount.replace(",", "")))
                         return {
                             ...tx,
-                            amountIn,
-                            amountOut,
-                            totalAmount
+                            // amountIn,
+                            // amountOut,
+                            totalAmount: Math.max(usts, 0)
                         }
                     })))
                     .filter(tx => tx.totalAmount > amount)
@@ -77,7 +83,5 @@ export const configureNotifications = async (fcdApi, db) => {
                 console.error(error.message)
             }
         })
-
-        await sleep(TIMEOUT)
     }
 }
