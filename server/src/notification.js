@@ -1,39 +1,51 @@
-import { Client, Intents } from "discord.js"
 import format from "./format.js"
+import getFinderLink from "./format/finderLink.js"
 import { sleep } from "./utils.js"
 
-export const notify = async (db) => {
-    const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
-    await client.login(process.env["DISCORD_TOKEN"])
-
+export const notify = async (db, discord) => {
     while (true) {
-        const txs = await db.all("SELECT id, address, hash, tx.amount, addresses, actions, timestamp, W.channel FROM tx INNER JOIN watch W ON W.account = TX.address WHERE notify = 1 ORDER BY id")
+        const txs = await db.all(
+            `SELECT tx.id, tx.address, tx.hash, tx.amount, tx.addresses, tx.actions, tx.timestamp, W.channel, W.minimum
+             FROM tx
+                 INNER JOIN watch W ON W.address = TX.address
+             WHERE tx.processed = 1
+               AND tx.notified IS NULL
+             ORDER BY id`
+        )
 
-        const promises = txs.map(async tx => {
-            const channel = client.channels.cache.get(tx.channel) ?? await client.channels.fetch(tx.channel)
-            try {
-                await notifyTx(channel, tx)
-                console.log("notify tx %d: channel %s", tx.id, tx.channel)
-                await db.run("UPDATE tx SET notify = 2 WHERE id = $id", {
-                    $id: tx.id
-                })
-            } catch (error) {
-                console.error("notify tx %d: error %s", tx.id, error.message)
-            }
-        })
+        const promises = txs.map(tx => notifyTx(db, discord, tx))
 
-        await Promise.all(promises)
+        await Promise.allSettled(promises)
 
         await sleep(10000)
     }
 }
 
-const notifyTx = async (channel, tx) => {
+const notifyTx = async (db, discord, tx) => {
+    try {
+        const channel = discord.channels.cache.get(tx.channel) ?? await discord.channels.fetch(tx.channel)
+        const shouldNotify = tx.amount > tx.minimum
+        if (shouldNotify) {
+            await sendDiscordNotification(channel, tx)
+            console.log("notify tx %d: channel %s", tx.id, tx.channel)
+        }
+        await db.run(
+            `UPDATE tx
+             SET notified = $notified
+             WHERE id = $id`,
+            { $notified: shouldNotify, $id: tx.id }
+        )
+    } catch (error) {
+        console.error("notify tx %d: error %s", tx.id, error.message)
+    }
+}
+
+const sendDiscordNotification = async (channel, tx) => {
     const embeds = {
         fields: [
             {
-                name: "ACCOUNT",
-                value: `[${tx.address}](https://finder.terra.money/mainnet/address/${tx.address})`,
+                name: "CONTRACT",
+                value: getFinderLink(tx.address, "address", tx.address),
             },
             {
                 name: "VALUE",
@@ -41,15 +53,15 @@ const notifyTx = async (channel, tx) => {
             },
             {
                 name: "ACTIONS",
-                value: tx.actions,
+                value: tx.actions.substring(0, 1024),
             },
             {
-                name: "ADDRESSES",
+                name: "SENDER/RECEIVER",
                 value: tx.addresses
             },
             {
                 name: "HASH",
-                value: `[${tx.hash}](https://finder.terra.money/mainnet/tx/${tx.hash})`,
+                value: getFinderLink(tx.hash, "tx", tx.hash),
             },
             {
                 name: "TIME",

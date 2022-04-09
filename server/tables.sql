@@ -1,26 +1,28 @@
 -- SQLite
 CREATE TABLE tx (
-    id INTEGER NOT NULL,
-    address TEXT NOT NULL,
-    hash TEXT NOT NULL,
-    json TEXT NOT NULL,
-    amount REAL,
+    id        INTEGER NOT NULL,
+    address   TEXT    NOT NULL,
+    json      TEXT    NOT NULL,
+    processed BOOLEAN NOT NULL,
+    notified  BOOLEAN,
+    hash      TEXT,
+    amount    REAL,
     addresses TEXT,
-    actions TEXT,
-    notify INTEGER,
+    actions   TEXT,
     timestamp TEXT,
     PRIMARY KEY(id, address)
 );
 
 CREATE TABLE watch (
-    account TEXT PRIMARY KEY,
-    amount REAL NOT NULL,
-    swap BOOLEAN NOT NULL,
-    channel TEXT NOT NULL,
-    lastProcessed INTEGER
+    address  TEXT    NOT NULL,
+    channel  TEXT    NOT NULL,
+    minimum  REAL    NOT NULL,
+    type     TEXT    NOT NULL,
+    PRIMARY KEY (address, channel)
 );
 
 CREATE TABLE label (
-    account TEXT PRIMARY KEY,
-    label TEXT
+    address TEXT,
+    label   TEXT,
+    PRIMARY KEY (address)
 );
