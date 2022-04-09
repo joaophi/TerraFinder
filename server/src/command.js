@@ -1,6 +1,8 @@
-import { REST } from "@discordjs/rest"
-import { Routes } from "discord-api-types/v9"
-import { SlashCommandBuilder } from "@discordjs/builders"
+import { SlashCommandBuilder } from "@discordjs/builders";
+import { REST } from "@discordjs/rest";
+import { Routes } from "discord-api-types/v9";
+import format from "./format.js";
+import getFinderLink, { LABELS } from "./format/finderLink.js";
 
 export const commands = async (db, discord) => {
     const commands = [
@@ -28,6 +30,35 @@ export const commands = async (db, discord) => {
         new SlashCommandBuilder()
             .setName("watchlist")
             .setDescription("Show channel watchlist"),
+        new SlashCommandBuilder()
+            .setName("min")
+            .setDescription("Change minimum amount of all watches in this channel")
+            .addNumberOption(option =>
+                option.setName("minimum")
+                    .setDescription("The minimum amount to notify")
+                    .setRequired(true)
+            ),
+        new SlashCommandBuilder()
+            .setName("label")
+            .setDescription("Label address")
+            .addStringOption(option =>
+                option.setName("address")
+                    .setDescription("The address to be labeled")
+                    .setRequired(true)
+            )
+            .addStringOption(option =>
+                option.setName("label")
+                    .setDescription("The label")
+                    .setRequired(true)
+            ),
+        new SlashCommandBuilder()
+            .setName("unlabel")
+            .setDescription("Unlabel address")
+            .addStringOption(option =>
+                option.setName("address")
+                    .setDescription("The address to be unlabeled")
+                    .setRequired(true)
+            )
     ].map(command => command.toJSON());
 
     const rest = new REST({ version: '9' }).setToken(process.env["DISCORD_TOKEN"]);
@@ -40,58 +71,91 @@ export const commands = async (db, discord) => {
         if (!interaction.isCommand())
             return
 
-        const { commandName } = interaction
-
-        if (commandName == "watch") {
-            await watchCommand(db, interaction)
-        } else if (commandName == "unwatch") {
-            await unwatchCommand(db, interaction)
-        } else if (commandName == "watchlist") {
-            await watchListCommand(db, interaction)
-        }
+        await myCommands[interaction.commandName](db, interaction)
     })
 }
 
-const watchCommand = async (db, interaction) => {
-    const address = interaction.options.getString("address")
-    const minimum = interaction.options.getNumber("minimum")
-    await db.run(
-        `INSERT OR REPLACE INTO watch (address, channel, minimum, type)
-         VALUES ($address, $channel, $minimum, 'swap')`,
-        {
-            $address: address,
-            $channel: interaction.channelId,
-            $minimum: minimum
-        }
-    )
-    await interaction.reply(`ADDED ${address} - ${minimum} UST`)
-}
+const myCommands = {
+    watch: async (db, interaction) => {
+        const address = interaction.options.getString("address")
+        const minimum = interaction.options.getNumber("minimum")
+        await db.run(
+            `INSERT OR REPLACE INTO watch (address, channel, minimum, type)
+             VALUES ($address, $channel, $minimum, 'swap')`,
+            {
+                $address: address,
+                $channel: interaction.channelId,
+                $minimum: minimum
+            }
+        )
+        await interaction.reply(`ADDED ${getFinderLink(address, "address", address)} - ${format.amount(minimum, 0)} UST`)
+    },
+    unwatch: async (db, interaction) => {
+        const address = interaction.options.getString("address")
+        await db.run(
+            `DELETE FROM watch
+             WHERE address = $address
+               AND channel = $channel`,
+            {
+                $address: address,
+                $channel: interaction.channelId,
+            }
+        )
+        await interaction.reply(`REMOVED ${address}`)
+    },
+    watchlist: async (db, interaction) => {
+        const watches = await db.all(
+            `SELECT address, minimum
+             FROM watch
+             WHERE channel = $channel`,
+            {
+                $channel: interaction.channelId,
+            }
+        )
+        const reply = watches
+            .map(({ address, minimum }) => `${getFinderLink(address, "address", address)} - ${format.amount(minimum, 0)} UST`)
+            .join("\n")
+        await interaction.reply(reply || "None")
+    },
+    min: async (db, interaction) => {
+        const minimum = interaction.options.getNumber("minimum")
+        await db.all(
+            `UPDATE watch
+             SET minimum = $minimum
+             WHERE channel = $channel`,
+            {
+                $minimum: minimum,
+                $channel: interaction.channelId,
+            }
+        )
+        await interaction.reply(`CHANGED ALL WATCHES TO ${format.amount(minimum, 0)} UST MINIMUM`)
+    },
+    label: async (db, interaction) => {
+        const address = interaction.options.getString("address")
+        const label = interaction.options.getString("label")
 
-const unwatchCommand = async (db, interaction) => {
-    const address = interaction.options.getString("address")
-    await db.run(
-        `DELETE FROM watch
-         WHERE address = $address
-           AND channel = $channel`,
-        {
-            $address: address,
-            $channel: interaction.channelId,
-        }
-    )
-    await interaction.reply(`REMOVED ${address}`)
-}
+        await db.all(
+            `INSERT OR REPLACE INTO label (address, label)
+             VALUES ($address, $label)`,
+            {
+                $address: address,
+                $label: label
+            }
+        )
+        LABELS.set(address, label)
+        await interaction.reply(`LABELLED ${address} TO ${label}`)
+    },
+    unlabel: async (db, interaction) => {
+        const address = interaction.options.getString("address")
 
-const watchListCommand = async (db, interaction) => {
-    const watches = await db.all(
-        `SELECT address, minimum
-         FROM watch
-         WHERE channel = $channel`,
-        {
-            $channel: interaction.channelId,
-        }
-    )
-    const reply = watches
-        .map(({ address, minimum }) => `${address} - ${minimum} UST`)
-        .join("\n")
-    await interaction.reply(reply || "None")
+        await db.all(
+            `DELETE FROM label
+             WHERE address = $address`,
+            {
+                $address: address,
+            }
+        )
+        LABELS.delete(address)
+        await interaction.reply(`REMOVED LABEL FROM ${address}`)
+    }
 }

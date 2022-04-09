@@ -5,6 +5,7 @@ import "dotenv/config"
 import { open } from "sqlite"
 import sqlite3 from "sqlite3"
 import { commands } from "./command.js"
+import { loadLabels } from "./format/finderLink.js"
 import { notify } from "./notification.js"
 import { process as processtx } from "./process.js"
 import { server } from "./server.js"
@@ -28,3 +29,4 @@ watch(db, api)
 processtx(db)
 notify(db, discord)
 commands(db, discord)
+loadLabels(db)
