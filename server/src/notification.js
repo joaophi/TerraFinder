@@ -58,5 +58,5 @@ const notifyTx = async (channel, tx) => {
         ]
     }
 
-    channel.send({ embeds: [embeds] })
+    await channel.send({ embeds: [embeds] })
 }
