@@ -2,7 +2,7 @@ import express from "express"
 import path from "path"
 import { isOneSided, parseTx } from "./amount.js"
 
-export const server = (server, client) => {
+export const server = (client) => {
     const server = express()
 
     const proxyPass = async (req, res) => {

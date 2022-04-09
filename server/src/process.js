@@ -28,15 +28,15 @@ const processWatch = async (db, { account, amount: notifyAmount, swap, lastProce
                 .filter(({ _, denom }) => denom == "UST")
                 .map(({ amount }) => parseFloat(amount.replace(",", "")))
 
-            const amount = Math.max(usts, 0)
+            const amount = Math.max(...usts, 0)
             const addresses = tx.addresses.map(a => `[${a}](https://finder.terra.money/mainnet/address/${a})`).join("\n")
             const notify = (amount > notifyAmount) && (swap != oneSided) ? 1 : 0
             const actions = await getTxActions(tx.rawTx)
 
+            console.log("process tx %d: amount %f notify %d", tx.id, amount, notify)
+
             if (!amount)
                 return
-
-            console.log("process tx %d: amount %f notify %d", tx.id, amount, notify)
 
             await db.run("UPDATE tx SET amount = $amount, addresses = $addresses, actions = $actions, notify = $notify, timestamp = $timestamp WHERE id = $id AND address = $address", {
                 $amount: amount,
