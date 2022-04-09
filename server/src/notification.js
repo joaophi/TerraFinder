@@ -1,87 +1,62 @@
-import axios from "axios"
-import { notifyTx } from "./discord.js"
-import { isOneSided, parseTx } from "./amount.js"
-import rateLimit from "axios-rate-limit"
+import { Client, Intents } from "discord.js"
+import format from "./format.js"
+import { sleep } from "./utils.js"
 
-const TIMEOUT = (parseInt(process.env["TIMEOUT_MIN"]) || 5) * 60 * 1000
+export const notify = async (db) => {
+    const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
+    await client.login(process.env["DISCORD_TOKEN"])
 
-const sleep = ms => new Promise(r => setTimeout(r, ms))
+    while (true) {
+        const txs = await db.all("SELECT id, address, hash, tx.amount, addresses, actions, timestamp, W.channel FROM tx INNER JOIN watch W ON W.account = TX.address WHERE notify = 1 ORDER BY id")
 
-const terraSwapApi = rateLimit(
-    axios.create({ baseURL: "https://api.terraswap.io/dashboard/" }),
-    { maxRequests: 1, perMilliseconds: 1000 }
-)
-const { data: unfilteredPairs } = await terraSwapApi.get("/pairs")
-const pairs = unfilteredPairs.filter(pair => pair.token1Volume > 0)
-pairs.sort((a, b) => b.volumeUst - a.volumeUst)
+        const promises = txs.map(async tx => {
+            const channel = client.channels.cache.get(tx.channel) ?? await client.channels.fetch(tx.channel)
+            try {
+                await notifyTx(channel, tx)
+                console.log("notify tx %d: channel %s", tx.id, tx.channel)
+                await db.run("UPDATE tx SET notify = 2 WHERE id = $id", {
+                    $id: tx.id
+                })
+            } catch (error) {
+                console.error("notify tx %d: error %s", tx.id, error.message)
+            }
+        })
 
-const priceCache = new Map();
-const getPrice = async (symbol) => {
-    if (priceCache.has(symbol)) {
-        const { price, date } = priceCache.get(symbol)
-        if (new Date() - date < 60 * 60 * 1000) {
-            return price
-        }
-    }
+        await Promise.all(promises)
 
-    let token = "token1"
-    let pair = pairs.find(pair => pair.pairAlias.toUpperCase() == `UST-${symbol}`.toUpperCase())
-    if (!pair) {
-        token = "token0"
-        pair = pairs.find(pair => pair.pairAlias.toUpperCase() == `${symbol}-UST`.toUpperCase())
-    }
-
-    try {
-        const { data } = await terraSwapApi.get(`/pairs/${pair.pairAddress}`)
-        const price = parseFloat(data[token].price)
-        priceCache.set(symbol, { price, date: new Date() })
-        return price
-    } catch (error) {
-        console.error(`${symbol}-${error.message}`)
-        return 0
+        await sleep(10000)
     }
 }
 
-export const configureNotifications = async (fcdApi, db) => {
-    while (true) {
-        db.each("SELECT account, amount, swap, channel, lastProcessed FROM watch", async (_, { account, amount, swap, channel, lastProcessed }) => {
-            try {
-                const response = await fcdApi.get("/v1/txs", { params: { account, limit: 10 } })
-
-                db.run("UPDATE watch SET lastProcessed = $lastProcessed WHERE account = $account", {
-                    $lastProcessed: response.data.txs?.[0]?.id ?? lastProcessed,
-                    $account: account
-                });
-
-                (await Promise.all(response.data.txs
-                    .filter(tx => lastProcessed && tx.id > lastProcessed)
-                    .map(tx => {
-                        console.log(`Processing: ${tx.id}`)
-                        return tx
-                    })
-                    .map(tx => { return { ...parseTx(tx, account), id: tx.id, account } })
-                    .filter(tx => (swap && !isOneSided(tx)) || (!swap && isOneSided(tx)))
-                    .map(async tx => {
-                        // const amountIn = await Promise.all(tx.amountIn.map(addUsd))
-                        // const amountOut = await Promise.all(tx.amountOut.map(addUsd))
-                        // const totalAmount = (swap ? amountIn : [...amountIn, ...amountOut])
-                        //     .map(a => a.usd)
-                        //     .reduce((a, b) => a + b, 0)
-                        const usts = [...tx.amountIn, ...tx.amountOut]
-                            .filter(({ _, denom }) => denom == "UST")
-                            .map(({ amount }) => parseFloat(amount.replace(",", "")))
-                        return {
-                            ...tx,
-                            // amountIn,
-                            // amountOut,
-                            totalAmount: Math.max(usts, 0)
-                        }
-                    })))
-                    .filter(tx => tx.totalAmount > amount)
-                    .forEach(tx => notifyTx(tx, channel))
-            } catch (error) {
-                console.error(error.message)
+const notifyTx = async (channel, tx) => {
+    const embeds = {
+        fields: [
+            {
+                name: "ACCOUNT",
+                value: `[${tx.address}](https://finder.terra.money/mainnet/address/${tx.address})`,
+            },
+            {
+                name: "VALUE",
+                value: `${format.amount(tx.amount, 0)} UST`,
+            },
+            {
+                name: "ACTIONS",
+                value: tx.actions,
+            },
+            {
+                name: "ADDRESSES",
+                value: tx.addresses
+            },
+            {
+                name: "HASH",
+                value: `[${tx.hash}](https://finder.terra.money/mainnet/tx/${tx.hash})`,
+            },
+            {
+                name: "TIME",
+                value: format.date(tx.timestamp),
             }
-        })
+        ]
     }
+
+    channel.send({ embeds: [embeds] })
 }

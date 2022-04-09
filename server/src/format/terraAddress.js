@@ -1,4 +1,5 @@
 import { useContracts } from "./api.js"
+import getFinderLink from "./finderLink.js"
 import getTokenAddress from "./tokenAddress.js"
 
 const getTerraAddress = async (address) => {
@@ -14,7 +15,7 @@ const getTerraAddress = async (address) => {
         return [protocol, contractName].join(' ')
     }
 
-    return getContractName(address) ?? getTokenAddress(address)
+    return getFinderLink(getContractName(address) ?? getTokenAddress(address), "address", address)
 }
 
 export default getTerraAddress

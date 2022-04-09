@@ -1,17 +1,24 @@
 import axios from "axios"
 import axiosRateLimit from "axios-rate-limit"
 import "dotenv/config"
-import express from "express"
+import { open } from "sqlite"
 import sqlite3 from "sqlite3"
-import { configureNotifications } from "./notification.js"
-import { configureApi } from "./server.js"
+import { notify } from "./notification.js"
+import { process } from "./process.js"
+import { watch } from "./watch.js"
 
-const db = new sqlite3.Database("app.db")
-const client = axiosRateLimit(
+const db = await open({
+    filename: "app.db",
+    driver: sqlite3.Database
+})
+const api = axiosRateLimit(
     axios.create({ baseURL: "https://fcd.terra.dev", }),
     { maxRequests: 1, perMilliseconds: 2000 }
 )
-const server = express()
+// const server = express()
 
-configureApi(server, client, db)
-configureNotifications(client, db)
+// configureApi(server, client, db)
+// configureNotifications(client, db)
+watch(db, api)
+process(db)
+notify(db)
