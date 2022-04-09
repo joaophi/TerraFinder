@@ -2,7 +2,9 @@ import express from "express"
 import path from "path"
 import { isOneSided, parseTx } from "./amount.js"
 
-export const configureApi = (server, client, db) => {
+export const server = (server, client) => {
+    const server = express()
+
     const proxyPass = async (req, res) => {
         try {
             const response = await client.get(req.url.slice(4))
