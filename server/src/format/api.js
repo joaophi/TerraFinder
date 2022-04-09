@@ -36,6 +36,24 @@ export const useTokenContractQuery = async (address) => {
     }
 }
 
+export const isAccount = async (address) => {
+    const lcd = useLCDClient()
+    const contracts = useContracts()
+
+    if (AccAddress.validate(address)) {
+        if (contracts?.[address]) {
+            return false
+        }
+
+        try {
+            await lcd.wasm.contractInfo(address)
+            return false
+        } catch (error) {
+            return true
+        }
+    }
+}
+
 export const useDenomTrace = async (denom = "", lcd) => {
     if (denom.startsWith('ibc')) {
         const hash = denom.replace('ibc/', '')

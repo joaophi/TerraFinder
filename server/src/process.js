@@ -1,4 +1,5 @@
 import { isOneSided, parseTx } from "./amount.js";
+import { isAccount } from "./format/api.js";
 import getTxActions from "./format/index.js";
 import { sleep } from "./utils.js";
 
@@ -9,7 +10,7 @@ export const process = async (db) => {
         const promises = watches.map((watch) => processWatch(db, watch))
 
         await Promise.all(promises)
-        
+
         await sleep(10000)
     }
 }
@@ -29,19 +30,24 @@ const processWatch = async (db, { account, amount: notifyAmount, swap, lastProce
                 .map(({ amount }) => parseFloat(amount.replace(",", "")))
 
             const amount = Math.max(...usts, 0)
-            const addresses = tx.addresses.map(a => `[${a}](https://finder.terra.money/mainnet/address/${a})`).join("\n")
             const notify = (amount > notifyAmount) && (swap != oneSided) ? 1 : 0
-            const actions = await getTxActions(tx.rawTx)
 
             console.log("process tx %d: amount %f notify %d", tx.id, amount, notify)
 
             if (!amount)
                 return
 
+            const actions = getTxActions(tx.rawTx)
+            const isAccountA = await Promise.all(tx.addresses.map(isAccount))
+            const addresses = tx.addresses
+                .filter((_, index) => isAccountA[index])
+                .map(addresses => `[${addresses}](https://finder.terra.money/mainnet/address/${addresses})`)
+                .join("\n") ?? ""
+
             await db.run("UPDATE tx SET amount = $amount, addresses = $addresses, actions = $actions, notify = $notify, timestamp = $timestamp WHERE id = $id AND address = $address", {
                 $amount: amount,
                 $addresses: addresses,
-                $actions: actions,
+                $actions: await actions,
                 $notify: notify,
                 $timestamp: tx.timestamp,
                 $id: tx.id,
@@ -49,7 +55,7 @@ const processWatch = async (db, { account, amount: notifyAmount, swap, lastProce
             })
 
         } catch (error) {
-            console.error("process tx %d: error %s", tx.id, error.message)
+            console.error("process tx %d: error %s", id, error.message)
         }
     })
 

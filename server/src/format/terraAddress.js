@@ -3,7 +3,7 @@ import getFinderLink from "./finderLink.js"
 import getTokenAddress from "./tokenAddress.js"
 
 const getTerraAddress = async (address) => {
-    const contracts = await useContracts()
+    const contracts = useContracts()
 
     const getContractName = (contractAddress) => {
         const contract = contracts?.[contractAddress]
@@ -15,7 +15,7 @@ const getTerraAddress = async (address) => {
         return [protocol, contractName].join(' ')
     }
 
-    return getFinderLink(getContractName(address) ?? getTokenAddress(address), "address", address)
+    return getFinderLink(getContractName(address) ?? await getTokenAddress(address), "address", address)
 }
 
 export default getTerraAddress

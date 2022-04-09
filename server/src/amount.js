@@ -1,5 +1,5 @@
 import { createAmountRuleSet, createLogMatcherForAmounts, getTxAmounts } from "@terra-money/log-finder-ruleset";
-import { Coin } from "@terra-money/terra.js";
+import { AccAddress, Coin } from "@terra-money/terra.js";
 import axios from "axios";
 import BN from "bignumber.js";
 import format from "./format.js";
@@ -57,7 +57,6 @@ const parseAmounts = (tx, address) => {
     const amountMatchedMsg = getTxAmounts(JSON.stringify(tx), amountLogMatcher, address)
     const amountIn = []
     const amountOut = []
-    const addresses = new Set()
     amountMatchedMsg?.forEach(matchedLog => {
         if (matchedLog && matchedLog[0]?.transformed?.type === "multiSend") {
             const amountInMap = new Map()
@@ -79,7 +78,6 @@ const parseAmounts = (tx, address) => {
                         if (recipient === address) {
                             amountInMap.set(denom, inStack)
                         } else {
-                            addresses.add(recipient)
                             amountOutMap.set(denom, outStack)
                         }
                     }
@@ -100,7 +98,6 @@ const parseAmounts = (tx, address) => {
                 const recipient = log.transformed?.recipient;
 
                 if (address === sender) {
-                    addresses.add(recipient)
                     amounts?.forEach(amount => {
                         const coin = splitCoinData(amount.trim());
                         if (coin) {
@@ -111,7 +108,6 @@ const parseAmounts = (tx, address) => {
                 }
 
                 if (address === recipient) {
-                    addresses.add(sender)
                     amounts?.forEach(amount => {
                         const coin = splitCoinData(amount.trim());
                         if (coin) {
@@ -124,18 +120,31 @@ const parseAmounts = (tx, address) => {
         }
     })
     return {
-        addresses,
         amountIn: amountIn.map(parseAmount),
         amountOut: amountOut.map(parseAmount)
     }
 }
 
+const parseAddresses = (tx, address) => {
+    const addresses = new Set()
+    tx.tx.value.msg
+        .forEach(msg =>
+            Object.keys(msg.value).map(key => {
+                if (AccAddress.validate(msg.value[key])) {
+                    addresses.add(msg.value[key])
+                }
+            })
+        )
+    return Array.from(addresses).filter(a => a && a != address)
+}
+
 export const parseTx = (tx, address) => {
-    const { addresses, amountIn, amountOut } = parseAmounts(tx, address)
+    const { amountIn, amountOut } = parseAmounts(tx, address)
+    const addresses = parseAddresses(tx, address)
 
     return {
         txHash: tx.txhash,
-        addresses: Array.from(addresses),
+        addresses,
         amountIn,
         amountOut,
         timestamp: tx.timestamp,
