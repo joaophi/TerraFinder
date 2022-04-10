@@ -89,7 +89,7 @@ const myCommands = {
                 $minimum: minimum
             }
         )
-        await interaction.reply(`ADDED ${getFinderLink(address, "address", address)} - ${format.amount(minimum, 0)} UST`)
+        await interaction.editReply(`ADDED ${getFinderLink(address, "address", address)} - ${format.amount(minimum, 0)} UST`)
     },
     unwatch: async (db, interaction) => {
         const address = interaction.options.getString("address")
@@ -102,7 +102,7 @@ const myCommands = {
                 $channel: interaction.channelId,
             }
         )
-        await interaction.reply(`REMOVED ${address}`)
+        await interaction.editReply(`REMOVED ${address}`)
     },
     watchlist: async (db, interaction) => {
         const watches = await db.all(
@@ -116,7 +116,7 @@ const myCommands = {
         const reply = watches
             .map(({ address, minimum }) => `${getFinderLink(address, "address", address)} - ${format.amount(minimum, 0)} UST`)
             .join("\n")
-        await interaction.reply(reply || "None")
+        await interaction.editReply(reply || "None")
     },
     min: async (db, interaction) => {
         const minimum = interaction.options.getNumber("minimum")
@@ -129,7 +129,7 @@ const myCommands = {
                 $channel: interaction.channelId,
             }
         )
-        await interaction.reply(`CHANGED ALL WATCHES TO ${format.amount(minimum, 0)} UST MINIMUM`)
+        await interaction.editReply(`CHANGED ALL WATCHES TO ${format.amount(minimum, 0)} UST MINIMUM`)
     },
     label: async (db, interaction) => {
         const address = interaction.options.getString("address")
@@ -144,7 +144,7 @@ const myCommands = {
             }
         )
         LABELS.set(address, label)
-        await interaction.reply(`LABELLED ${address} TO ${label}`)
+        await interaction.editReply(`LABELLED ${address} TO ${label}`)
     },
     unlabel: async (db, interaction) => {
         const address = interaction.options.getString("address")
@@ -157,6 +157,6 @@ const myCommands = {
             }
         )
         LABELS.delete(address)
-        await interaction.reply(`REMOVED LABEL FROM ${address}`)
+        await interaction.editReply(`REMOVED LABEL FROM ${address}`)
     }
 }
