@@ -71,6 +71,7 @@ export const commands = async (db, discord) => {
         if (!interaction.isCommand())
             return
 
+        interaction.deferReply()
         await myCommands[interaction.commandName](db, interaction)
     })
 }

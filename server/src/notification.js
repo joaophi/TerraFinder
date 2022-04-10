@@ -57,7 +57,7 @@ const sendDiscordNotification = async (channel, tx) => {
             },
             {
                 name: "SENDER/RECEIVER",
-                value: tx.addresses
+                value: tx.addresses || "not found"
             },
             {
                 name: "HASH",
