@@ -1,15 +1,15 @@
 import { ReactNode } from "react";
 import PaginationButtons from "./PaginationButtons";
 
-export type PaginationProps = {
+export type PaginationProps<T> = {
   title: string;
-  next?: number;
-  action?: (offset: number) => void;
+  next?: T;
+  action?: (offset: T) => void;
   loading?: boolean;
   children: ReactNode;
 };
 
-const Pagination = (props: PaginationProps) => {
+const Pagination = (props: PaginationProps<any>) => {
   const { children, action, next, loading } = props;
 
   return (

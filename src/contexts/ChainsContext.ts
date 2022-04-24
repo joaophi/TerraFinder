@@ -30,7 +30,11 @@ export const useCurrentChain = () => {
 };
 
 export const useFCDURL = () => {
-  // const { lcd } = useCurrentChain();
-  // return lcd.replace("lcd", "fcd");
+  const { lcd } = useCurrentChain();
+  return lcd.replace("lcd", "fcd");
+};
+
+export const useAPIURL = () => {
   return "/api";
+  // return "http://localhost:3001/api";
 };

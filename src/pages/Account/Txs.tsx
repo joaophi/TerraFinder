@@ -1,37 +1,37 @@
-import { useEffect, useState } from "react";
 import { isEmpty } from "lodash";
-import Pagination from "../../components/Pagination";
-import FlexTable from "../../components/FlexTable";
+import { useEffect, useState } from "react";
 import Card from "../../components/Card";
-import Info from "../../components/Info";
-import Finder from "../../components/Finder";
-import Loading from "../../components/Loading";
 import Coin from "../../components/Coin";
-import { useCurrentChain } from "../../contexts/ChainsContext";
-import format from "../../scripts/format";
-import useFCD from "../../hooks/useFCD";
-import s from "./Txs.module.scss";
+import Finder from "../../components/Finder";
+import FlexTable from "../../components/FlexTable";
+import Info from "../../components/Info";
+import Loading from "../../components/Loading";
+import Pagination from "../../components/Pagination";
 import PaginationButtons from "../../components/PaginationButtons";
+import { useCurrentChain } from "../../contexts/ChainsContext";
+import useAPI from "../../hooks/useAPI";
+import format from "../../scripts/format";
+import s from "./Txs.module.scss";
 
 const Txs = ({ address }: { address: string }) => {
   const { chainID } = useCurrentChain();
-  const [offset, setOffset] = useState<number>(0);
+  const [offset, setOffset] = useState<string | undefined>(undefined);
 
-  const { data, isLoading } = useFCD<{ next: number; txs: SimpleTxResponse[] }>(
+  const { data, isLoading } = useAPI<{ next: string; txs: SimpleTxResponse[] }>(
     "/v1/txs",
     offset,
     100,
     address
   );
   const [allTx, setAllTx] = useState<SimpleTxResponse[]>([]);
-  const [txsRow, setTxsRow] = useState<JSX.Element[][]>([]);
+  // const [txsRow, setTxsRow] = useState<JSX.Element[][]>([]);
 
   useEffect(() => {
     if (data?.txs) {
-      const txRow = data.txs.map(tx => getRow(tx, chainID));
-      setAllTx([...allTx, ...data.txs]);
-      setTxsRow(stack => [...stack, ...txRow]);
-      if (data.next) setOffset(data.next);
+      setAllTx(allTx => [...allTx, ...data.txs]);
+      // const txRow = data.txs.map(tx => getRow(tx, chainID));
+      // setTxsRow(stack => [...stack, ...txRow]);
+      // if (data.next) setOffset(data.next);
     }
     // eslint-disable-next-line
   }, [data, chainID, address]);
@@ -79,8 +79,44 @@ const Txs = ({ address }: { address: string }) => {
     document.body.removeChild(element);
   };
 
+  const [filter, setFilter] = useState<string>("A");
+
+  const select = (
+    <select
+      key={"SELECT"}
+      onChange={e => setFilter(e.target.value)}
+      value={filter}
+    >
+      <option key={"ALL"} value={"A"}>
+        ALL
+      </option>
+      <option key={"ONE"} value={"O"}>
+        ONE SIDED
+      </option>
+      <option key={"TWO"} value={"T"}>
+        TWO SIDED
+      </option>
+    </select>
+  );
+
+  const txsRow = allTx
+    .filter(
+      tx =>
+        filter === "A" ||
+        (filter === "O" &&
+          Boolean(tx.amountIn.length) !== Boolean(tx.amountOut.length)) ||
+        (filter === "T" &&
+          Boolean(tx.amountIn.length) === Boolean(tx.amountOut.length))
+    )
+    .map(tx => getRow(tx, chainID));
+
   return (
-    <Card title="Transactions" bordered headerClassName={s.cardTitle}>
+    <Card
+      title="Transactions"
+      bordered
+      headerClassName={s.cardTitle}
+      actions={[select]}
+    >
       <Pagination
         next={data?.next}
         title="transaction"
@@ -129,17 +165,29 @@ const getRow = (response: SimpleTxResponse, network: string) => {
         </Finder>
       </div>
     </span>,
-    <span>
-      <Finder q="address" network={network} v={addresses[0]}>
-        {addresses[0]}
-      </Finder>
+    <span className={s.amount}>
+      {addresses.map((address, index) => {
+        return (
+          <span key={index}>
+            <Finder q="address" network={network} v={address}>
+              {address}
+            </Finder>
+          </span>
+        );
+      })}
     </span>,
     <span className={s.amount}>
       {amountOut.length
-        ? amountOut.map(({ amount, denom }, index) => {
+        ? amountOut.map(({ amount, denom, usd }, index) => {
             return (
               <span key={index}>
-                -<Coin amount={amount} denom={denom} alreadyFormated={true} />
+                -
+                <Coin
+                  amount={amount}
+                  denom={denom}
+                  alreadyFormated={true}
+                  usd={usd}
+                />
               </span>
             );
           })
@@ -147,10 +195,16 @@ const getRow = (response: SimpleTxResponse, network: string) => {
     </span>,
     <span className={s.amount}>
       {amountIn.length
-        ? amountIn.map(({ amount, denom }, index) => {
+        ? amountIn.map(({ amount, denom, usd }, index) => {
             return (
               <span key={index}>
-                +<Coin amount={amount} denom={denom} alreadyFormated={true} />
+                +
+                <Coin
+                  amount={amount}
+                  denom={denom}
+                  alreadyFormated={true}
+                  usd={usd}
+                />
               </span>
             );
           })

@@ -83,7 +83,7 @@ interface TxResponse {
 interface SimpleTxResponse {
   txHash: string;
   addresses: string[];
-  amountIn: { amount: string; denom: string }[];
-  amountOut: { amount: string; denom: string }[];
+  amountIn: { amount: string; denom: string; usd: number }[];
+  amountOut: { amount: string; denom: string; usd: number }[];
   timestamp: string;
 }

@@ -15,6 +15,7 @@ type Props = {
   children?: string;
   decimals?: number;
   alreadyFormated?: boolean;
+  usd?: number;
 };
 
 type Contract = Dictionary<Contracts>;
@@ -39,7 +40,8 @@ const Amount = (props: Props) => {
     denom,
     children,
     decimals,
-    alreadyFormated
+    alreadyFormated,
+    usd
   } = props;
   const whitelist: Tokens = useRecoilValue(Whitelist);
   const contracts: Contract = useRecoilValue(Contracts);
@@ -67,6 +69,7 @@ const Amount = (props: Props) => {
         {data
           ? ` ${format.denom(data.base_denom)}`
           : denom && ` ${renderDenom(denom, whitelist, contracts)}`}
+        {!usd || denom === "uusd" ? "" : ` (${usd?.toFixed?.(2)} USD)`}
       </small>
     </span>
   );
