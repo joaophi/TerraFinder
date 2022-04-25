@@ -4,7 +4,7 @@ import { useAPIURL } from "../contexts/ChainsContext";
 
 const useAPI = <T>(
   url: string,
-  offset?: any,
+  offset?: number,
   limit?: number,
   address?: string
 ): { data: T | undefined; isLoading: boolean } => {

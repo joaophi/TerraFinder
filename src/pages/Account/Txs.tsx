@@ -15,7 +15,7 @@ import s from "./Txs.module.scss";
 
 const Txs = ({ address }: { address: string }) => {
   const { chainID } = useCurrentChain();
-  const [offset, setOffset] = useState<string | undefined>(undefined);
+  const [offset, setOffset] = useState<number | undefined>(undefined);
 
   const { data, isLoading } = useAPI<{ next: string; txs: SimpleTxResponse[] }>(
     "/v1/txs",
@@ -170,7 +170,7 @@ const getRow = (response: SimpleTxResponse, network: string) => {
         return (
           <span key={index}>
             <Finder q="address" network={network} v={address}>
-              {address}
+              {format.truncate(address, [6, 6])}
             </Finder>
           </span>
         );
