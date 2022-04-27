@@ -17,12 +17,10 @@ const Txs = ({ address }: { address: string }) => {
   const { chainID } = useCurrentChain();
   const [offset, setOffset] = useState<number | undefined>(undefined);
 
-  const { data, isLoading } = useAPI<{ next: string; txs: SimpleTxResponse[] }>(
-    "/v1/txs",
-    offset,
-    100,
-    address
-  );
+  const { data, isLoading } = useAPI<{
+    next?: number;
+    txs: SimpleTxResponse[];
+  }>("/v1/txs", offset, 100, address);
   const [allTx, setAllTx] = useState<SimpleTxResponse[]>([]);
   // const [txsRow, setTxsRow] = useState<JSX.Element[][]>([]);
 
@@ -31,7 +29,7 @@ const Txs = ({ address }: { address: string }) => {
       setAllTx(allTx => [...allTx, ...data.txs]);
       // const txRow = data.txs.map(tx => getRow(tx, chainID));
       // setTxsRow(stack => [...stack, ...txRow]);
-      // if (data.next) setOffset(data.next);
+      if (data.next) setOffset(data.next);
     }
     // eslint-disable-next-line
   }, [data, chainID, address]);
