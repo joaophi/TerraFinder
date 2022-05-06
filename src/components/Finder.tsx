@@ -2,8 +2,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 import c from "classnames";
 import { useCurrentChain } from "../contexts/ChainsContext";
-import useAPI from "../hooks/useAPI";
 import format from "../scripts/format";
+import useLabel from "../hooks/useLabel";
 
 type Props = {
   q: string;
@@ -16,16 +16,11 @@ type Props = {
 
 const Finder = ({ q, v, children, className, brand, network }: Props) => {
   const { name } = useCurrentChain();
-  const { data } = useAPI<{ label?: string }>(
-    "/v1/label",
-    undefined,
-    undefined,
-    v || children
-  );
+  const { data } = useLabel(v || children);
 
   let text: string;
-  if (data?.label) {
-    text = `${data.label} (${format.truncate(v || children, [6, 6])})`;
+  if (data) {
+    text = `${data} (${format.truncate(v || children, [6, 6])})`;
   } else {
     text = children;
   }
